@@ -37,11 +37,17 @@ func RecoveryWithWriter(out io.Writer) HandlerFunc {
 	if out != nil {
 		logger = log.New(out, "\n\n\x1b[31m", log.LstdFlags)
 	}
+
 	return func(c *Context) {
 		defer func() {
+
+			//异常捕获
 			if err := recover(); err != nil {
 				// Check for a broken connection, as it is not really a
 				// condition that warrants a panic stack trace.
+
+
+				//对端关闭网络连接？
 				var brokenPipe bool
 				if ne, ok := err.(*net.OpError); ok {
 					if se, ok := ne.Err.(*os.SyscallError); ok {
@@ -50,6 +56,7 @@ func RecoveryWithWriter(out io.Writer) HandlerFunc {
 						}
 					}
 				}
+
 				if logger != nil {
 					stack := stack(3)
 					httprequest, _ := httputil.DumpRequest(c.Request, false)
@@ -59,8 +66,7 @@ func RecoveryWithWriter(out io.Writer) HandlerFunc {
 						logger.Printf("[Recovery] %s panic recovered:\n%s\n%s\n%s%s",
 							timeFormat(time.Now()), string(httprequest), err, stack, reset)
 					} else {
-						logger.Printf("[Recovery] %s panic recovered:\n%s\n%s%s",
-							timeFormat(time.Now()), err, stack, reset)
+						logger.Printf("[Recovery] %s panic recovered:\n%s\n%s%s", timeFormat(time.Now()), err, stack, reset)
 					}
 				}
 
@@ -89,7 +95,8 @@ func stack(skip int) []byte {
 		if !ok {
 			break
 		}
-		// Print this much at least.  If we can't find the source, it won't show.
+		// Print this much at least.  
+		// If we can't find the source, it won't show.
 		fmt.Fprintf(buf, "%s:%d (0x%x)\n", file, line, pc)
 		if file != lastFile {
 			data, err := ioutil.ReadFile(file)
@@ -104,6 +111,8 @@ func stack(skip int) []byte {
 	return buf.Bytes()
 }
 
+
+
 // source returns a space-trimmed slice of the n'th line.
 func source(lines [][]byte, n int) []byte {
 	n-- // in stack trace, lines are 1-indexed but our array is 0-indexed
@@ -112,6 +121,10 @@ func source(lines [][]byte, n int) []byte {
 	}
 	return bytes.TrimSpace(lines[n])
 }
+
+
+
+
 
 // function returns, if possible, the name of the function containing the PC.
 func function(pc uintptr) []byte {

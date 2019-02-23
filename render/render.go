@@ -35,6 +35,7 @@ var (
 
 func writeContentType(w http.ResponseWriter, value []string) {
 	header := w.Header()
+	//eg. Content-Type: text/html; charset=utf-8
 	if val := header["Content-Type"]; len(val) == 0 {
 		header["Content-Type"] = value
 	}

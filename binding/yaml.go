@@ -12,6 +12,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+
 type yamlBinding struct{}
 
 func (yamlBinding) Name() string {

@@ -12,6 +12,10 @@ import (
 	"time"
 )
 
+
+
+
+
 func mapUri(ptr interface{}, m map[string][]string) error {
 	return mapFormByTag(ptr, m, "uri")
 }
@@ -20,19 +24,31 @@ func mapForm(ptr interface{}, form map[string][]string) error {
 	return mapFormByTag(ptr, form, "form")
 }
 
+
+
+
 func mapFormByTag(ptr interface{}, form map[string][]string, tag string) error {
-	typ := reflect.TypeOf(ptr).Elem()
-	val := reflect.ValueOf(ptr).Elem()
+
+
+	typ := reflect.TypeOf(ptr) .Elem()  //获取变量类型，返回reflect.Type类型 
+	val := reflect.ValueOf(ptr).Elem()	//获取变量的值，返回reflect.Value类型 
+
+
+	//遍历结构体属性
 	for i := 0; i < typ.NumField(); i++ {
-		typeField := typ.Field(i)
-		structField := val.Field(i)
-		if !structField.CanSet() {
+
+		typeField   := typ.Field(i)	 	//属性类型
+		structField := val.Field(i)		//属性值
+		if !structField.CanSet() { 		//是否可以修改其值，一个值必须是可以获得地址且不能通过访问结构的非导出字段获得，方可被修改
 			continue
 		}
 
-		structFieldKind := structField.Kind()
-		inputFieldName := typeField.Tag.Get(tag)
-		inputFieldNameList := strings.Split(inputFieldName, ",")
+		structFieldKind 	:= structField.Kind() 					//获取属性类别，返回一个常量 
+		inputFieldName 		:= typeField.Tag.Get(tag)				//获取属性tag，比如tag="json"或者tag="yaml"
+
+
+		////** 这块逻辑不用看，一般用不到 **/////
+		inputFieldNameList 	:= strings.Split(inputFieldName, ",") 	//
 		inputFieldName = inputFieldNameList[0]
 		var defaultValue string
 		if len(inputFieldNameList) > 1 {
@@ -41,19 +57,25 @@ func mapFormByTag(ptr interface{}, form map[string][]string, tag string) error {
 				defaultValue = defaultList[1]
 			}
 		}
+		/////////////
+
 		if inputFieldName == "" {
+			//如果tag为空，直接用属性名做键
 			inputFieldName = typeField.Name
 
 			// if "form" tag is nil, we inspect if the field is a struct or struct pointer.
-			// this would not make sense for JSON parsing but it does for a form
-			// since data is flatten
+			// this would not make sense for JSON parsing but it does for a form since data is flatten
+			
+			//如果属性是结构体指针类型的，那么修正该熟悉类型为其指向的成员的类型。
 			if structFieldKind == reflect.Ptr {
 				if !structField.Elem().IsValid() {
 					structField.Set(reflect.New(structField.Type().Elem()))
 				}
-				structField = structField.Elem()
+				structField 	= structField.Elem()
 				structFieldKind = structField.Kind()
 			}
+
+			//如果属性是结构体类型，那么递归～～～
 			if structFieldKind == reflect.Struct {
 				err := mapFormByTag(structField.Addr().Interface(), form, tag)
 				if err != nil {
@@ -61,9 +83,13 @@ func mapFormByTag(ptr interface{}, form map[string][]string, tag string) error {
 				}
 				continue
 			}
-		}
-		inputValue, exists := form[inputFieldName]
 
+			//其他类型，不予处理
+		}
+
+		//从form参数表中取inputFieldName对应值
+		inputValue, exists := form[inputFieldName]
+		//若不存在，使用默认值
 		if !exists {
 			if defaultValue == "" {
 				continue
@@ -73,23 +99,34 @@ func mapFormByTag(ptr interface{}, form map[string][]string, tag string) error {
 		}
 
 		numElems := len(inputValue)
+		//如果inputValue是个数组，且结构体属性是切片类型，那么:
 		if structFieldKind == reflect.Slice && numElems > 0 {
+			//获取切片数组的元素类型（sliceOf）
 			sliceOf := structField.Type().Elem().Kind()
-			slice := reflect.MakeSlice(structField.Type(), numElems, numElems)
+			//创建指定大小的切片
+			slice 	:= reflect.MakeSlice(structField.Type(), numElems, numElems)
+			//逐个元素赋值
 			for i := 0; i < numElems; i++ {
+				//根据元素类型，元素值，切片下标逐个赋值
 				if err := setWithProperType(sliceOf, inputValue[i], slice.Index(i)); err != nil {
 					return err
 				}
 			}
+			//设置外层结构的属性值，这里的i是外层循环的i
 			val.Field(i).Set(slice)
 			continue
 		}
+
+		//如果结构体属性类型是时间类型，那么需要进行相应格式转换
 		if _, isTime := structField.Interface().(time.Time); isTime {
+			//根据元素类型，元素值，结构体属性字段进行赋值
 			if err := setTimeField(inputValue[0], typeField, structField); err != nil {
 				return err
 			}
 			continue
 		}
+
+		//根据元素类型，元素值，结构体属性字段进行赋值
 		if err := setWithProperType(typeField.Type.Kind(), inputValue[0], structField); err != nil {
 			return err
 		}

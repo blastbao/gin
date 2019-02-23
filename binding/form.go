@@ -12,19 +12,26 @@ type formBinding struct{}
 type formPostBinding struct{}
 type formMultipartBinding struct{}
 
+
 func (formBinding) Name() string {
 	return "form"
 }
 
 func (formBinding) Bind(req *http.Request, obj interface{}) error {
+
+	//parse url and "application/x-www-form-urlencoded" body params, saved both in req.PostForm and req.Form .
 	if err := req.ParseForm(); err != nil {
 		return err
 	}
+
+	//parse "multipart/form-data" body params, saved both in req.MultipartForm and req.Form .
 	if err := req.ParseMultipartForm(defaultMemory); err != nil {
 		if err != http.ErrNotMultipart {
 			return err
 		}
 	}
+
+	// parse req.Form and convert it then save in obj
 	if err := mapForm(obj, req.Form); err != nil {
 		return err
 	}
@@ -36,6 +43,7 @@ func (formPostBinding) Name() string {
 }
 
 func (formPostBinding) Bind(req *http.Request, obj interface{}) error {
+	//parse url and "application/x-www-form-urlencoded" body params, saved in r.PostForm.
 	if err := req.ParseForm(); err != nil {
 		return err
 	}
@@ -50,6 +58,7 @@ func (formMultipartBinding) Name() string {
 }
 
 func (formMultipartBinding) Bind(req *http.Request, obj interface{}) error {
+	//parse "multipart/form-data" body params, saved in r.MultipartForm.
 	if err := req.ParseMultipartForm(defaultMemory); err != nil {
 		return err
 	}

@@ -18,6 +18,7 @@ package gin
 //	   that is, replace "/.." by "/" at the beginning of a path.
 //
 // If the result of this process is an empty string, "/" is returned.
+
 func cleanPath(p string) string {
 	// Turn empty string into "/"
 	if p == "" {

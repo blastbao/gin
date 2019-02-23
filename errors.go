@@ -17,22 +17,22 @@ type ErrorType uint64
 
 const (
 	// ErrorTypeBind is used when Context.Bind() fails.
-	ErrorTypeBind ErrorType = 1 << 63
+	ErrorTypeBind 		ErrorType = 1 << 63
 	// ErrorTypeRender is used when Context.Render() fails.
-	ErrorTypeRender ErrorType = 1 << 62
+	ErrorTypeRender 	ErrorType = 1 << 62
 	// ErrorTypePrivate indicates a private error.
-	ErrorTypePrivate ErrorType = 1 << 0
+	ErrorTypePrivate 	ErrorType = 1 << 0
 	// ErrorTypePublic indicates a public error.
-	ErrorTypePublic ErrorType = 1 << 1
+	ErrorTypePublic 	ErrorType = 1 << 1
 	// ErrorTypeAny indicates any other error.
-	ErrorTypeAny ErrorType = 1<<64 - 1
+	ErrorTypeAny 		ErrorType = 1 << 64 - 1
 	// ErrorTypeNu indicates any other error.
 	ErrorTypeNu = 2
 )
 
 // Error represents a error's specification.
 type Error struct {
-	Err  error
+	Err  error 			//继承
 	Type ErrorType
 	Meta interface{}
 }
@@ -55,13 +55,15 @@ func (msg *Error) SetMeta(data interface{}) *Error {
 
 // JSON creates a properly formated JSON
 func (msg *Error) JSON() interface{} {
-	json := H{}
+
+	json := H{} // type H map[string]interface{}
+
 	if msg.Meta != nil {
 		value := reflect.ValueOf(msg.Meta)
 		switch value.Kind() {
-		case reflect.Struct:
+		case reflect.Struct: 	//如果是结构体类型，就直接返回
 			return msg.Meta
-		case reflect.Map:
+		case reflect.Map: 		//如果是map类型，就转换成H后再返回
 			for _, key := range value.MapKeys() {
 				json[key.String()] = value.MapIndex(key).Interface()
 			}
@@ -69,9 +71,11 @@ func (msg *Error) JSON() interface{} {
 			json["meta"] = msg.Meta
 		}
 	}
+
 	if _, ok := json["error"]; !ok {
 		json["error"] = msg.Error()
 	}
+	
 	return json
 }
 
@@ -134,6 +138,7 @@ func (a errorMsgs) Errors() []string {
 	return errorStrings
 }
 
+
 func (a errorMsgs) JSON() interface{} {
 	switch len(a) {
 	case 0:
@@ -149,15 +154,20 @@ func (a errorMsgs) JSON() interface{} {
 	}
 }
 
+
+
 // MarshalJSON implements the json.Marshaller interface.
 func (a errorMsgs) MarshalJSON() ([]byte, error) {
 	return json.Marshal(a.JSON())
 }
 
+
+
 func (a errorMsgs) String() string {
 	if len(a) == 0 {
 		return ""
 	}
+
 	var buffer bytes.Buffer
 	for i, msg := range a {
 		fmt.Fprintf(&buffer, "Error #%02d: %s\n", i+1, msg.Err)
@@ -165,5 +175,24 @@ func (a errorMsgs) String() string {
 			fmt.Fprintf(&buffer, "     Meta: %v\n", msg.Meta)
 		}
 	}
+
 	return buffer.String()
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

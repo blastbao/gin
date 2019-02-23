@@ -39,6 +39,9 @@ func (ps Params) ByName(name string) (va string) {
 	return
 }
 
+
+// 每种请求方式（Get、Post等）又有很多路径与其对应。
+// 每个路径是一个node结构，该结构的handlers保存了如何处理该路径下该请求方式的方法集合。
 type methodTree struct {
 	method string
 	root   *node
@@ -85,16 +88,49 @@ const (
 	catchAll
 )
 
+
+
+
 type node struct {
-	path      string
-	indices   string
-	children  []*node
-	handlers  HandlersChain
-	priority  uint32
-	nType     nodeType
-	maxParams uint8
-	wildChild bool
+
+    // 保存这个节点上的URL路径
+    // 假设有search和support两个url, 共同的parent节点的path="s"
+    // 后面两个节点的path分别是"earch"和"upport"
+    path      string
+
+
+    // 和children[]对应, 保存的是分裂的分支的第一个字符
+    // 例如search和support, 那么s节点的indices对应的"eu"
+    // 代表有两个分支, 分支的首字母分别是e和u
+    indices   string
+
+
+    // 子节点
+    children  []*node
+    // 处理者列表
+    handlers  HandlersChain
+    priority  uint32
+
+
+
+    // 结点类型：static, root, param, catchAll
+    // 	static: 静态节点, 例如上面分裂出来作为parent的s
+    // 	root: 如果插入的节点是第一个, 那么是root节点
+    // 	catchAll: 有*匹配的节点
+    // 	param: 除上面外的节点
+    nType     nodeType
+
+
+    // 记录路径上最多的参数个数
+    maxParams uint8
+
+
+    // 判断当前节点路径是不是通配符节点, 例如(:param_name | *param_name)
+    wildChild bool
 }
+
+
+
 
 // increments priority of the given child and reorders if necessary.
 func (n *node) incrementChildPrio(pos int) int {
@@ -120,18 +156,27 @@ func (n *node) incrementChildPrio(pos int) int {
 	return newPos
 }
 
+
+
+
+
 // addRoute adds a node with the given handle to the path.
 // Not concurrency-safe!
+
+
+// 向tree中增加节点, 先找到插入节点的位置, 如果存在common前缀, 那么需要将节点进行分裂, 然后再插入child节点.
 func (n *node) addRoute(path string, handlers HandlersChain) {
 	fullPath := path
 	n.priority++
 	numParams := countParams(path)
 
 	// non-empty tree
+    // 如果之前这个Method tree中已经存在节点了
 	if len(n.path) > 0 || len(n.children) > 0 {
 	walk:
 		for {
 			// Update maxParams of the current node
+			// 更新当前node的较大参数个数
 			if numParams > n.maxParams {
 				n.maxParams = numParams
 			}
@@ -139,14 +184,19 @@ func (n *node) addRoute(path string, handlers HandlersChain) {
 			// Find the longest common prefix.
 			// This also implies that the common prefix contains no ':' or '*'
 			// since the existing key can't contain those chars.
+			// 找到最长公共前缀
 			i := 0
 			max := min(len(path), len(n.path))
+			// 匹配相同的字符
 			for i < max && path[i] == n.path[i] {
 				i++
 			}
 
 			// Split edge
+			// 说明前面有一段是匹配的, 例如之前为:/search, 现在来了一个/support, 
+            // 那么会将/s拿出来作为parent节点, 将child节点变成earch和upport
 			if i < len(n.path) {
+				// 将原本路径的i后半部分作为前半部分的child节点
 				child := node{
 					path:      n.path[i:],
 					wildChild: n.wildChild,
@@ -157,24 +207,29 @@ func (n *node) addRoute(path string, handlers HandlersChain) {
 				}
 
 				// Update maxParams (max of all children)
+				// 更新较大参数个数
 				for i := range child.children {
 					if child.children[i].maxParams > child.maxParams {
 						child.maxParams = child.children[i].maxParams
 					}
 				}
 
+				// 当前节点的孩子节点变成刚刚分出来的这个后半部分节点
 				n.children = []*node{&child}
 				// []byte for proper unicode char conversion, see #65
 				n.indices = string([]byte{n.path[i]})
+				// 路径变成前i半部分path
 				n.path = path[:i]
 				n.handlers = nil
 				n.wildChild = false
 			}
 
 			// Make new node a child of this node
+            // 同时, 将新来的这个节点插入新的parent节点中当做孩子节点
 			if i < len(path) {
+				// i的后半部分作为路径, 即上面例子support中的upport
 				path = path[i:]
-
+				// 如果n是参数节点(包含:或者*)
 				if n.wildChild {
 					n = n.children[0]
 					n.priority++
@@ -186,6 +241,7 @@ func (n *node) addRoute(path string, handlers HandlersChain) {
 					numParams--
 
 					// Check if the wildcard matches
+					// 例如: /blog/:ppp 和 /blog/:ppppppp, 需要检查更长的通配符
 					if len(path) >= len(n.path) && n.path == path[:len(n.path)] {
 						// check for longer wildcard, e.g. :name and :names
 						if len(n.path) >= len(path) || path[len(n.path)] == '/' {
@@ -215,28 +271,34 @@ func (n *node) addRoute(path string, handlers HandlersChain) {
 				}
 
 				// Check if a child with the next path byte exists
+				// 检查路径是否已经存在, 例如search和support第一个字符相同
 				for i := 0; i < len(n.indices); i++ {
+					// 找到第一个匹配的字符
 					if c == n.indices[i] {
 						i = n.incrementChildPrio(i)
 						n = n.children[i]
 						continue walk
 					}
 				}
-
 				// Otherwise insert it
+				// new一个node
 				if c != ':' && c != '*' {
 					// []byte for proper unicode char conversion, see #65
+					// 记录第一个字符,并放在indices中
 					n.indices += string([]byte{c})
 					child := &node{
 						maxParams: numParams,
 					}
+					// 增加孩子节点
 					n.children = append(n.children, child)
 					n.incrementChildPrio(len(n.indices) - 1)
 					n = child
 				}
+				// 插入节点
 				n.insertChild(numParams, path, fullPath, handlers)
 				return
-
+				// 说明是相同的路径,仅仅需要将handle替换就OK
+                // 如果是nil那么说明取消这个handle, 不是空不允许
 			} else if i == len(path) { // Make node a (in-path) leaf
 				if n.handlers != nil {
 					panic("handlers are already registered for path '" + fullPath + "'")
@@ -246,11 +308,15 @@ func (n *node) addRoute(path string, handlers HandlersChain) {
 			return
 		}
 	} else { // Empty tree
+		// 如果是空树, 那么插入节点
 		n.insertChild(numParams, path, fullPath, handlers)
+		// 节点的种类是root
 		n.nType = root
 	}
 }
 
+// insertChild函数是根据path本身进行分割, 将'/'分开的部分分别作为节点保存, 形成一棵树结构. 
+// 注意参数匹配中的':'和'*'的区别, 前者是匹配一个字段, 后者是匹配后面所有的路径. 具体的细节, 请查看代码中的注释.
 func (n *node) insertChild(numParams uint8, path string, fullPath string, handlers HandlersChain) {
 	var offset int // already handled bytes of the path
 

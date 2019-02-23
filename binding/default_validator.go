@@ -22,22 +22,27 @@ var _ StructValidator = &defaultValidator{}
 func (v *defaultValidator) ValidateStruct(obj interface{}) error {
 	value := reflect.ValueOf(obj)
 	valueType := value.Kind()
+
+	//如果变量是指针、map、slice、channel、Array类型，那么需要使用reflect.Typeof(v).Elem()来确定包含的类型。
 	if valueType == reflect.Ptr {
 		valueType = value.Elem().Kind()
 	}
+
+	//如果变量是结构体类型，
 	if valueType == reflect.Struct {
-		v.lazyinit()
+		v.lazyinit() //懒加载
 		if err := v.validate.Struct(obj); err != nil {
 			return err
 		}
 	}
+	
 	return nil
 }
 
-// Engine returns the underlying validator engine which powers the default
-// Validator instance. This is useful if you want to register custom validations
-// or struct level validations. See validator GoDoc for more info -
-// https://godoc.org/gopkg.in/go-playground/validator.v8
+// Engine returns the underlying validator engine which powers the default Validator instance. 
+// This is useful if you want to register custom validations or struct level validations. 
+// 
+// See validator GoDoc for more info - https://godoc.org/gopkg.in/go-playground/validator.v8
 func (v *defaultValidator) Engine() interface{} {
 	v.lazyinit()
 	return v.validate

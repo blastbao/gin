@@ -9,6 +9,17 @@ import (
 	"net/http"
 )
 
+
+
+// HTTP 协议的重定向响应的状态码为 3xx 。
+// 浏览器在接收到重定向响应的时候，会采用该响应提供的新的 URL ，并立即进行加载；
+// 大多数情况下，除了会有一小部分性能损失之外，重定向操作对于用户来说是不可见的。
+// 不同类型的重定向映射可以划分为三个类别：永久重定向、临时重定向和特殊重定向。
+//
+// reference: 
+// 	1. https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Redirections
+// 	2. https://colobu.com/2017/04/19/go-http-redirect/
+
 // Redirect contains the http request reference and redirects status code and location.
 type Redirect struct {
 	Code     int
@@ -23,6 +34,7 @@ func (r Redirect) Render(w http.ResponseWriter) error {
 	if (r.Code < 300 || r.Code > 308) && r.Code != 201 {
 		panic(fmt.Sprintf("Cannot redirect with status code %d", r.Code))
 	}
+
 	http.Redirect(w, r.Request, r.Location, r.Code)
 	return nil
 }

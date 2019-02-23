@@ -43,9 +43,12 @@ type AsciiJSON struct {
 // SecureJSONPrefix is a string which represents SecureJSON prefix.
 type SecureJSONPrefix string
 
-var jsonContentType = []string{"application/json; charset=utf-8"}
-var jsonpContentType = []string{"application/javascript; charset=utf-8"}
-var jsonAsciiContentType = []string{"application/json"}
+var jsonContentType 		= []string{"application/json; charset=utf-8"}
+var jsonpContentType	 	= []string{"application/javascript; charset=utf-8"}
+var jsonAsciiContentType 	= []string{"application/json"}
+
+
+
 
 // Render (JSON) writes data with custom ContentType.
 func (r JSON) Render(w http.ResponseWriter) (err error) {
@@ -62,7 +65,7 @@ func (r JSON) WriteContentType(w http.ResponseWriter) {
 
 // WriteJSON marshals the given interface object and writes it with custom ContentType.
 func WriteJSON(w http.ResponseWriter, obj interface{}) error {
-	writeContentType(w, jsonContentType)
+	writeContentType(w, jsonContentType) // 写入 "application/json; charset=utf-8"
 	jsonBytes, err := json.Marshal(obj)
 	if err != nil {
 		return err
@@ -70,6 +73,9 @@ func WriteJSON(w http.ResponseWriter, obj interface{}) error {
 	_, err = w.Write(jsonBytes)
 	return err
 }
+
+
+
 
 // Render (IndentedJSON) marshals the given interface object and writes it with custom ContentType.
 func (r IndentedJSON) Render(w http.ResponseWriter) error {
@@ -107,11 +113,14 @@ func (r SecureJSON) Render(w http.ResponseWriter) error {
 
 // WriteContentType (SecureJSON) writes JSON ContentType.
 func (r SecureJSON) WriteContentType(w http.ResponseWriter) {
+	//在返回头部写入: "application/json; charset=utf-8"
 	writeContentType(w, jsonContentType)
 }
 
 // Render (JsonpJSON) marshals the given interface object and writes it and its callback with custom ContentType.
 func (r JsonpJSON) Render(w http.ResponseWriter) (err error) {
+
+	//
 	r.WriteContentType(w)
 	ret, err := json.Marshal(r.Data)
 	if err != nil {

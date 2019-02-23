@@ -18,8 +18,15 @@ const (
 
 type responseWriterBase interface {
 	http.ResponseWriter
+
+	// Hijack被译为劫持，在“处理HTTP请求”的这个上下文中，就意味着可以让我们“劫持”（或者说“保持”）HTTP请求链接，
+	// 做一些其他操作（比如根据需要修改HTTP响应的内容），然后再在之后的某个时间将响应“推送”回去。
 	http.Hijacker
+
+	//
 	http.Flusher
+
+	//
 	http.CloseNotifier
 
 	// Returns the HTTP response status code of the current request.

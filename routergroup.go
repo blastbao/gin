@@ -38,11 +38,13 @@ type IRoutes interface {
 
 // RouterGroup is used internally to configure router, a RouterGroup is associated with
 // a prefix and an array of handlers (middleware).
+
+// RouterGroup 描述的是路由的一个父节点，里面包含了父节点的一些属性
 type RouterGroup struct {
-	Handlers HandlersChain
-	basePath string
-	engine   *Engine
-	root     bool
+    Handlers HandlersChain 	// 父节点路由的监听器，实际上最后也是一个带有上下文指针的回调
+    basePath string  		// 路由路径，相对于子路由的上级路径
+    engine   *Engine 		// 父节点路由的Engine实体
+    root     bool   		// 是否为根节点路由
 }
 
 var _ IRouter = &RouterGroup{}
@@ -70,11 +72,17 @@ func (group *RouterGroup) BasePath() string {
 }
 
 func (group *RouterGroup) handle(httpMethod, relativePath string, handlers HandlersChain) IRoutes {
+	// 将 group.basePath 和 relativePath 加起来得到最终的路径
 	absolutePath := group.calculateAbsolutePath(relativePath)
+	// 将现有的 Handlers 和 handlers 合并起来
 	handlers = group.combineHandlers(handlers)
+	// 将这个route加入到engine.tree
 	group.engine.addRoute(httpMethod, absolutePath, handlers)
+	// 返回
 	return group.returnObj()
 }
+
+
 
 // Handle registers a new request handle and middleware with the given path and method.
 // The last handler should be the real handler, the other ones should be middleware that can and should be shared among different routes.
@@ -182,11 +190,19 @@ func (group *RouterGroup) StaticFS(relativePath string, fs http.FileSystem) IRou
 	return group.returnObj()
 }
 
+
+
+
 func (group *RouterGroup) createStaticHandler(relativePath string, fs http.FileSystem) HandlerFunc {
+
+
+	// absolutePath := joinPaths(group.basePath, relativePath)
 	absolutePath := group.calculateAbsolutePath(relativePath)
+	// http.StripPrefix用于过滤掉特定的url前缀 
 	fileServer := http.StripPrefix(absolutePath, http.FileServer(fs))
 
 	return func(c *Context) {
+		
 		if _, nolisting := fs.(*onlyfilesFS); nolisting {
 			c.Writer.WriteHeader(http.StatusNotFound)
 		}
@@ -204,6 +220,20 @@ func (group *RouterGroup) createStaticHandler(relativePath string, fs http.FileS
 		fileServer.ServeHTTP(c.Writer, c.Request)
 	}
 }
+
+
+
+
+
+// 组成handler链式处理：
+// 	1. 生成一个新的handler切片
+// 	2. 把中间件的handler插入到头部
+// 	3. 把用户自定义处理某路径下请求的handler插入到尾部
+// 	4. 返回新生成的切片
+
+//注意：
+//1. 因为是创建的新切片，所以此前设置的中间件 group.Handlers 并没被改变
+//2. 而对于每个需要被路由的请求，之前注册的中间件对应的 group.Handlers 都会被调用
 
 func (group *RouterGroup) combineHandlers(handlers HandlersChain) HandlersChain {
 	finalSize := len(group.Handlers) + len(handlers)

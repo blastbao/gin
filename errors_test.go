@@ -18,6 +18,7 @@ func TestError(t *testing.T) {
 		Err:  baseError,
 		Type: ErrorTypePrivate,
 	}
+
 	assert.Equal(t, err.Error(), baseError.Error())
 	assert.Equal(t, H{"error": baseError.Error()}, err.JSON())
 
@@ -38,6 +39,7 @@ func TestError(t *testing.T) {
 		"status": "200",
 		"data":   "some data",
 	})
+
 	assert.Equal(t, H{
 		"error":  baseError.Error(),
 		"status": "200",
@@ -65,9 +67,18 @@ func TestError(t *testing.T) {
 
 func TestErrorSlice(t *testing.T) {
 	errs := errorMsgs{
-		{Err: errors.New("first"), Type: ErrorTypePrivate},
-		{Err: errors.New("second"), Type: ErrorTypePrivate, Meta: "some data"},
-		{Err: errors.New("third"), Type: ErrorTypePublic, Meta: H{"status": "400"}},
+		{
+			Err: errors.New("first"), 
+			Type: ErrorTypePrivate},
+			{
+				Err: errors.New("second"), 
+				Type: ErrorTypePrivate, Meta: "some data",
+			},
+			{
+				Err: errors.New("third"), 
+				Type: ErrorTypePublic, 
+				Meta: H{"status": "400"},
+		},
 	}
 
 	assert.Equal(t, errs, errs.ByType(ErrorTypeAny))

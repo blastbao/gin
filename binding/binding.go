@@ -29,7 +29,8 @@ type Binding interface {
 	Bind(*http.Request, interface{}) error
 }
 
-// BindingBody adds BindBody method to Binding. BindBody is similar with Bind,
+// BindingBody adds BindBody method to Binding. 
+// BindBody is similar with Bind,
 // but it reads the body from supplied bytes instead of req.Body.
 type BindingBody interface {
 	Binding
@@ -83,8 +84,10 @@ var (
 // Default returns the appropriate Binding instance based on the HTTP method
 // and the content type.
 func Default(method, contentType string) Binding {
+
+	//对于GET方式，使用缺省类型。
 	if method == "GET" {
-		return Form
+		return Form //缺省类型
 	}
 
 	switch contentType {

@@ -38,16 +38,17 @@ type LoggerConfig struct {
 
 	// SkipPaths is a url path array which logs are not written.
 	// Optional.
+	// 对于 SkipPaths 中的路径，不需要打印日志。
 	SkipPaths []string
 }
 
 // LogFormatter gives the signature of the formatter function passed to LoggerWithFormatter
 type LogFormatter func(params LogFormatterParams) string
 
+
 // LogFormatterParams is the structure any formatter will be handed when time to log comes
 type LogFormatterParams struct {
 	Request *http.Request
-
 	// TimeStamp shows the time after the server returns a response.
 	TimeStamp time.Time
 	// StatusCode is HTTP response code.
@@ -63,12 +64,18 @@ type LogFormatterParams struct {
 	// ErrorMessage is set if error has occurred in processing the request.
 	ErrorMessage string
 	// IsTerm shows whether does gin's output descriptor refers to a terminal.
+	// 如果 IsTerm 为 true，意味着日志要输出到终端
 	IsTerm bool
 }
 
+
+
 // defaultLogFormatter is the default log format function Logger middleware uses.
 var defaultLogFormatter = func(param LogFormatterParams) string {
+
 	var statusColor, methodColor, resetColor string
+	
+	// 如果 IsTerm 是true，意味着日志要输出到终端。
 	if param.IsTerm {
 		statusColor = colorForStatus(param.StatusCode)
 		methodColor = colorForMethod(param.Method)
@@ -76,13 +83,17 @@ var defaultLogFormatter = func(param LogFormatterParams) string {
 	}
 
 	return fmt.Sprintf("[GIN] %v |%s %3d %s| %13v | %15s |%s %-7s %s %s\n%s",
-		param.TimeStamp.Format("2006/01/02 - 15:04:05"),
-		statusColor, param.StatusCode, resetColor,
-		param.Latency,
-		param.ClientIP,
-		methodColor, param.Method, resetColor,
-		param.Path,
-		param.ErrorMessage,
+		param.TimeStamp.Format("2006/01/02 - 15:04:05"), //时间戳
+		statusColor, 		//状态颜色
+		param.StatusCode, 	//状态码
+		resetColor,			//重置颜色
+		param.Latency,		//延迟
+		param.ClientIP,		//客户端IP
+		methodColor, 		//方法颜色
+		param.Method, 		//方法
+		resetColor,			//重置颜色
+		param.Path,			//路径
+		param.ErrorMessage,	//错误信息
 	)
 }
 
@@ -136,36 +147,41 @@ func LoggerWithWriter(out io.Writer, notlogged ...string) HandlerFunc {
 
 // LoggerWithConfig instance a Logger middleware with config.
 func LoggerWithConfig(conf LoggerConfig) HandlerFunc {
+
+	//日志格式
 	formatter := conf.Formatter
 	if formatter == nil {
 		formatter = defaultLogFormatter
 	}
 
+	//输出io.Writer，默认情况下，gin.DefaultWriter = os.Stdout
 	out := conf.Output
 	if out == nil {
 		out = DefaultWriter
 	}
 
+	//忽略日志的url
 	notlogged := conf.SkipPaths
 
+	//检查日志是否输出到终端
 	isTerm := true
-
-	if w, ok := out.(*os.File); (!ok ||
-		(os.Getenv("TERM") == "dumb" || (!isatty.IsTerminal(w.Fd()) && !isatty.IsCygwinTerminal(w.Fd()))) ||
-		disableColor) && !forceColor {
+	if w, ok := out.(*os.File); (!ok || (os.Getenv("TERM") == "dumb" || (!isatty.IsTerminal(w.Fd()) && !isatty.IsCygwinTerminal(w.Fd()))) || disableColor) && !forceColor {
 		isTerm = false
 	}
 
+	//把忽略日志的urls从数组转为map，便于查找
 	var skip map[string]struct{}
-
 	if length := len(notlogged); length > 0 {
 		skip = make(map[string]struct{}, length)
-
 		for _, path := range notlogged {
-			skip[path] = struct{}{}
+			skip[path] = struct{}{} //空结构体
 		}
 	}
 
+	
+
+
+	//返回中间件
 	return func(c *Context) {
 		// Start timer
 		start := time.Now()
@@ -177,31 +193,29 @@ func LoggerWithConfig(conf LoggerConfig) HandlerFunc {
 
 		// Log only when path is not being skipped
 		if _, ok := skip[path]; !ok {
+			//构造日志显示参数
 			param := LogFormatterParams{
 				Request: c.Request,
 				IsTerm:  isTerm,
 			}
-
-			// Stop timer
-			param.TimeStamp = time.Now()
-			param.Latency = param.TimeStamp.Sub(start)
-
-			param.ClientIP = c.ClientIP()
-			param.Method = c.Request.Method
-			param.StatusCode = c.Writer.Status()
-			param.ErrorMessage = c.Errors.ByType(ErrorTypePrivate).String()
-
+			param.TimeStamp 	= time.Now()
+			param.Latency 		= param.TimeStamp.Sub(start)
+			param.ClientIP 		= c.ClientIP()
+			param.Method 		= c.Request.Method
+			param.StatusCode 	= c.Writer.Status()
+			param.ErrorMessage 	= c.Errors.ByType(ErrorTypePrivate).String()
 			if raw != "" {
 				path = path + "?" + raw
 			}
-
 			param.Path = path
-
+			//执行日志输出
 			fmt.Fprint(out, formatter(param))
 		}
 	}
 }
 
+
+//不同状态对应不同颜色
 func colorForStatus(code int) string {
 	switch {
 	case code >= http.StatusOK && code < http.StatusMultipleChoices:
@@ -215,6 +229,8 @@ func colorForStatus(code int) string {
 	}
 }
 
+
+//不同方法对应不同颜色
 func colorForMethod(method string) string {
 	switch method {
 	case "GET":

@@ -37,21 +37,33 @@ const (
 
 const abortIndex int8 = math.MaxInt8 / 2
 
-// Context is the most important part of gin. It allows us to pass variables between middleware,
-// manage the flow, validate the JSON of a request and render a JSON response for example.
+// Context is the most important part of gin. 
+// It allows us to pass variables between middleware, manage the flow, 
+// validate the JSON of a request and render a JSON response for example.
+
 type Context struct {
+
+
+	// 用来响应 
 	writermem responseWriter
+
+
+	//ServeHTTP的方法传递的两个参数，一个是Request，一个是ResponseWriter，
+	//Engine中的ServeHTTP的方法就是要对这两个对象进行读取或者写入操作。
+	//而且这两个对象往往是需要同时存在的，为了避免很多函数都需要传递这两个参数，
+	//gin就封装一个结构来把这两个对象放在里面：Context。
+
 	Request   *http.Request
 	Writer    ResponseWriter
 
-	Params   Params
-	handlers HandlersChain
-	index    int8
+	Params   params 			// 路径当中的参数
+	handlers HandlersChain		// 处理函数数组
+	index    int8 				// 当前在运行着第几个处理函数
 
 	engine *Engine
 
 	// Keys is a key/value pair exclusively for the context of each request.
-	Keys map[string]interface{}
+	Keys map[string]interface{}  // 各个中间件添加的key value
 
 	// Errors is a list of errors attached to all the handlers/middlewares who used this context.
 	Errors errorMsgs
@@ -60,9 +72,14 @@ type Context struct {
 	Accepted []string
 }
 
+
+
+
 /************************************/
 /********** CONTEXT CREATION ********/
 /************************************/
+
+
 
 func (c *Context) reset() {
 	c.Writer = &c.writermem
@@ -73,6 +90,7 @@ func (c *Context) reset() {
 	c.Errors = c.Errors[0:0]
 	c.Accepted = nil
 }
+
 
 // Copy returns a copy of the current context that can be safely used outside the request's scope.
 // This has to be used when the context has to be passed to a goroutine.
@@ -85,8 +103,10 @@ func (c *Context) Copy() *Context {
 	return &cp
 }
 
-// HandlerName returns the main handler's name. For example if the handler is "handleGetUsers()",
-// this function will return "main.handleGetUsers".
+
+
+// HandlerName returns the main handler's name. 
+// For example if the handler is "handleGetUsers()", this function will return "main.handleGetUsers".
 func (c *Context) HandlerName() string {
 	return nameOfFunction(c.handlers.Last())
 }
@@ -104,6 +124,7 @@ func (c *Context) Handler() HandlerFunc {
 // It executes the pending handlers in the chain inside the calling handler.
 // See example in GitHub.
 func (c *Context) Next() {
+	///注意，c.index是类成员变量，重复调用next()需要注意index值变化规律，因为handers[i]内部可能也调用的next()。
 	c.index++
 	for c.index < int8(len(c.handlers)) {
 		c.handlers[c.index](c)
@@ -152,12 +173,16 @@ func (c *Context) AbortWithError(code int, err error) *Error {
 /********* ERROR MANAGEMENT *********/
 /************************************/
 
-// Error attaches an error to the current context. The error is pushed to a list of errors.
+// Error attaches an error to the current context. 
+// The error is pushed to a list of errors.
 // It's a good idea to call Error for each error that occurred during the resolution of a request.
+//
 // A middleware can be used to collect all the errors and push them to a database together,
 // print a log, or append it in the HTTP response.
+//
 // Error will panic if err is nil.
 func (c *Context) Error(err error) *Error {
+
 	if err == nil {
 		panic("err is nil")
 	}
@@ -174,12 +199,13 @@ func (c *Context) Error(err error) *Error {
 	return parsedError
 }
 
+
 /************************************/
 /******** METADATA MANAGEMENT********/
 /************************************/
 
 // Set is used to store a new key/value pair exclusively for this context.
-// It also lazy initializes  c.Keys if it was not used previously.
+// It also lazy initializes c.Keys if it was not used previously.
 func (c *Context) Set(key string, value interface{}) {
 	if c.Keys == nil {
 		c.Keys = make(map[string]interface{})
@@ -194,7 +220,8 @@ func (c *Context) Get(key string) (value interface{}, exists bool) {
 	return
 }
 
-// MustGet returns the value for the given key if it exists, otherwise it panics.
+// MustGet returns the value for the given key if it exists,
+// otherwise it panics.
 func (c *Context) MustGet(key string) interface{} {
 	if value, exists := c.Get(key); exists {
 		return value
@@ -295,11 +322,14 @@ func (c *Context) GetStringMapStringSlice(key string) (smss map[string][]string)
 /************************************/
 
 // Param returns the value of the URL param.
+//
 // It is a shortcut for c.Params.ByName(key)
 //     router.GET("/user/:id", func(c *gin.Context) {
 //         // a GET request to /user/john
 //         id := c.Param("id") // id == "john"
 //     })
+
+// 根据key获取url参数
 func (c *Context) Param(key string) string {
 	return c.Params.ByName(key)
 }
@@ -312,6 +342,8 @@ func (c *Context) Param(key string) string {
 // 	   c.Query("name") == "Manu"
 // 	   c.Query("value") == ""
 // 	   c.Query("wtf") == ""
+
+// 
 func (c *Context) Query(key string) string {
 	value, _ := c.GetQuery(key)
 	return value
@@ -334,17 +366,21 @@ func (c *Context) DefaultQuery(key, defaultValue string) string {
 // GetQuery is like Query(), it returns the keyed url query value
 // if it exists `(value, true)` (even when the value is an empty string),
 // otherwise it returns `("", false)`.
+//
 // It is shortcut for `c.Request.URL.Query().Get(key)`
 //     GET /?name=Manu&lastname=
 //     ("Manu", true) == c.GetQuery("name")
-//     ("", false) == c.GetQuery("id")
-//     ("", true) == c.GetQuery("lastname")
+//     ("", false)    == c.GetQuery("id")
+//     ("", true)     == c.GetQuery("lastname")
+
+// 根据key获取url参数
 func (c *Context) GetQuery(key string) (string, bool) {
 	if values, ok := c.GetQueryArray(key); ok {
 		return values[0], ok
 	}
 	return "", false
 }
+
 
 // QueryArray returns a slice of strings for a given query key.
 // The length of the slice depends on the number of params with the given key.
@@ -353,8 +389,10 @@ func (c *Context) QueryArray(key string) []string {
 	return values
 }
 
-// GetQueryArray returns a slice of strings for a given query key, plus
-// a boolean value whether at least one value exists for the given key.
+// GetQueryArray returns a slice of strings for a given query key, 
+// plus a boolean value whether at least one value exists for the given key.
+
+// 封装了c.Request.URL.Query()方法的调用，从中取出key对应的values。
 func (c *Context) GetQueryArray(key string) ([]string, bool) {
 	if values, ok := c.Request.URL.Query()[key]; ok && len(values) > 0 {
 		return values, true
@@ -412,8 +450,8 @@ func (c *Context) PostFormArray(key string) []string {
 	return values
 }
 
-// GetPostFormArray returns a slice of strings for a given form key, plus
-// a boolean value whether at least one value exists for the given key.
+// GetPostFormArray returns a slice of strings for a given form key, 
+// plus a boolean value whether at least one value exists for the given key.
 func (c *Context) GetPostFormArray(key string) ([]string, bool) {
 	req := c.Request
 	if err := req.ParseMultipartForm(c.engine.MaxMultipartMemory); err != nil {
@@ -441,12 +479,16 @@ func (c *Context) PostFormMap(key string) map[string]string {
 // GetPostFormMap returns a map for a given form key, plus a boolean value
 // whether at least one value exists for the given key.
 func (c *Context) GetPostFormMap(key string) (map[string]string, bool) {
+
+
 	req := c.Request
+
 	if err := req.ParseMultipartForm(c.engine.MaxMultipartMemory); err != nil {
 		if err != http.ErrNotMultipart {
 			debugPrint("error on parse multipart form map: %v", err)
 		}
 	}
+
 	dicts, exist := c.get(req.PostForm, key)
 
 	if !exist && req.MultipartForm != nil && req.MultipartForm.File != nil {
@@ -461,15 +503,22 @@ func (c *Context) get(m map[string][]string, key string) (map[string]string, boo
 	dicts := make(map[string]string)
 	exist := false
 	for k, v := range m {
+		// k 			="PostForm[uid]"
+		// k[0:i] 		="PostForm"
+		// k[i+1:] 		="uid]"
+		// k[i+1:][:j] 	="uid"
+		// 因此，如果key的值是PostForm，那么就会取出uid这个subKey和v[0]存入参数dict中。
 		if i := strings.IndexByte(k, '['); i >= 1 && k[0:i] == key {
 			if j := strings.IndexByte(k[i+1:], ']'); j >= 1 {
 				exist = true
+				//注意，dicts[][]中存的不是key而是subKey
 				dicts[k[i+1:][:j]] = v[0]
 			}
 		}
 	}
 	return dicts, exist
 }
+
 
 // FormFile returns the first file for the provided form key.
 func (c *Context) FormFile(name string) (*multipart.FileHeader, error) {
@@ -481,6 +530,7 @@ func (c *Context) FormFile(name string) (*multipart.FileHeader, error) {
 	_, fh, err := c.Request.FormFile(name)
 	return fh, err
 }
+
 
 // MultipartForm is the parsed multipart form, including file uploads.
 func (c *Context) MultipartForm() (*multipart.Form, error) {
@@ -511,9 +561,13 @@ func (c *Context) SaveUploadedFile(file *multipart.FileHeader, dst string) error
 //     "application/json" --> JSON binding
 //     "application/xml"  --> XML binding
 // otherwise --> returns an error.
+//
 // It parses the request's body as JSON if Content-Type == "application/json" using JSON or XML as a JSON input.
 // It decodes the json payload into the struct specified as a pointer.
 // It writes a 400 error and sets Content-Type header "text/plain" in the response if input is not valid.
+
+
+
 func (c *Context) Bind(obj interface{}) error {
 	b := binding.Default(c.Request.Method, c.ContentType())
 	return c.MustBindWith(obj, b)
@@ -549,14 +603,18 @@ func (c *Context) BindUri(obj interface{}) error {
 	return nil
 }
 
+
+
 // MustBindWith binds the passed struct pointer using the specified binding engine.
 // It will abort the request with HTTP 400 if any error occurs.
 // See the binding package.
 func (c *Context) MustBindWith(obj interface{}, b binding.Binding) error {
+
 	if err := c.ShouldBindWith(obj, b); err != nil {
 		c.AbortWithError(http.StatusBadRequest, err).SetType(ErrorTypeBind) // nolint: errcheck
 		return err
 	}
+
 	return nil
 }
 
@@ -614,6 +672,7 @@ func (c *Context) ShouldBindWith(obj interface{}, b binding.Binding) error {
 // NOTE: This method reads the body before binding. So you should use
 // ShouldBindWith for better performance if you need to call only once.
 func (c *Context) ShouldBindBodyWith(obj interface{}, bb binding.BindingBody) (err error) {
+	
 	var body []byte
 	if cb, ok := c.Get(BodyBytesKey); ok {
 		if cbb, ok := cb.([]byte); ok {
@@ -627,13 +686,15 @@ func (c *Context) ShouldBindBodyWith(obj interface{}, bb binding.BindingBody) (e
 		}
 		c.Set(BodyBytesKey, body)
 	}
+
 	return bb.BindBody(body, obj)
 }
 
-// ClientIP implements a best effort algorithm to return the real client IP, it parses
-// X-Real-IP and X-Forwarded-For in order to work properly with reverse-proxies such us: nginx or haproxy.
+// ClientIP implements a best effort algorithm to return the real client IP, 
+// it parses X-Real-IP and X-Forwarded-For in order to work properly with reverse-proxies such us: nginx or haproxy.
 // Use X-Forwarded-For before X-Real-Ip as nginx uses X-Real-Ip with the proxy's IP.
 func (c *Context) ClientIP() string {
+
 	if c.engine.ForwardedByClientIP {
 		clientIP := c.requestHeader("X-Forwarded-For")
 		clientIP = strings.TrimSpace(strings.Split(clientIP, ",")[0])
@@ -710,6 +771,7 @@ func (c *Context) Header(key, value string) {
 	c.Writer.Header().Set(key, value)
 }
 
+
 // GetHeader returns value from request headers.
 func (c *Context) GetHeader(key string) string {
 	return c.requestHeader(key)
@@ -751,20 +813,31 @@ func (c *Context) Cookie(name string) (string, error) {
 	return val, nil
 }
 
+
+
 // Render writes the response headers and calls render.Render to render data.
 func (c *Context) Render(code int, r render.Render) {
+
+	// c.writermem.WriteHeader(code)
 	c.Status(code)
 
+	// bodyAllowedForStatus reports whether a given response status code permits a body. 
+	// See RFC 7230, section 3.3.
 	if !bodyAllowedForStatus(code) {
 		r.WriteContentType(c.Writer)
 		c.Writer.WriteHeaderNow()
 		return
 	}
 
+	//
 	if err := r.Render(c.Writer); err != nil {
 		panic(err)
 	}
 }
+
+
+
+
 
 // HTML renders the HTTP template specified by its file name.
 // It also updates the HTTP code and sets the Content-Type as "text/html".
@@ -928,14 +1001,17 @@ func (c *Context) Negotiate(code int, config Negotiate) {
 
 // NegotiateFormat returns an acceptable Accept format.
 func (c *Context) NegotiateFormat(offered ...string) string {
+
 	assert1(len(offered) > 0, "you must provide at least one offer")
 
 	if c.Accepted == nil {
 		c.Accepted = parseAccept(c.requestHeader("Accept"))
 	}
+
 	if len(c.Accepted) == 0 {
 		return offered[0]
 	}
+
 	for _, accepted := range c.Accepted {
 		for _, offert := range offered {
 			if accepted == offert {
@@ -943,6 +1019,7 @@ func (c *Context) NegotiateFormat(offered ...string) string {
 			}
 		}
 	}
+
 	return ""
 }
 
@@ -955,9 +1032,9 @@ func (c *Context) SetAccepted(formats ...string) {
 /***** GOLANG.ORG/X/NET/CONTEXT *****/
 /************************************/
 
-// Deadline returns the time when work done on behalf of this context
-// should be canceled. Deadline returns ok==false when no deadline is
-// set. Successive calls to Deadline return the same results.
+// Deadline returns the time when work done on behalf of this context should be canceled. 
+// Deadline returns ok==false when no deadline is set. 
+// Successive calls to Deadline return the same results.
 func (c *Context) Deadline() (deadline time.Time, ok bool) {
 	return
 }
@@ -979,9 +1056,9 @@ func (c *Context) Err() error {
 	return nil
 }
 
-// Value returns the value associated with this context for key, or nil
-// if no value is associated with key. Successive calls to Value with
-// the same key returns the same result.
+// Value returns the value associated with this context for key, 
+// or nil if no value is associated with key. 
+// Successive calls to Value with the same key returns the same result.
 func (c *Context) Value(key interface{}) interface{} {
 	if key == 0 {
 		return c.Request
