@@ -122,10 +122,6 @@ func source(lines [][]byte, n int) []byte {
 	return bytes.TrimSpace(lines[n])
 }
 
-
-
-
-
 // function returns, if possible, the name of the function containing the PC.
 func function(pc uintptr) []byte {
 	fn := runtime.FuncForPC(pc)

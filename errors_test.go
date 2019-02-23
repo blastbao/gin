@@ -69,15 +69,17 @@ func TestErrorSlice(t *testing.T) {
 	errs := errorMsgs{
 		{
 			Err: errors.New("first"), 
-			Type: ErrorTypePrivate},
-			{
-				Err: errors.New("second"), 
-				Type: ErrorTypePrivate, Meta: "some data",
-			},
-			{
-				Err: errors.New("third"), 
-				Type: ErrorTypePublic, 
-				Meta: H{"status": "400"},
+			Type: ErrorTypePrivate,
+		},
+		{
+			Err: errors.New("second"), 
+			Type: ErrorTypePrivate, 
+			Meta: "some data",
+		},
+		{
+			Err: errors.New("third"), 
+			Type: ErrorTypePublic, 
+			Meta: H{"status": "400"},
 		},
 	}
 

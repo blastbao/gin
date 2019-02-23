@@ -534,7 +534,6 @@ func serveError(c *Context, code int, defaultMessage []byte) {
 }
 
 
-
 //尾重定向
 func redirectTrailingSlash(c *Context) {
 	req := c.Request
